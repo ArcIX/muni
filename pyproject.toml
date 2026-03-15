@@ -9,7 +9,6 @@ description = "A trading strategy backtesting tool"
 dependencies = [
     "yfinance",
     "pandas",
-    "pandas-ta",
     "pyarrow",
     "matplotlib",
     "yfinance-cache",   # To help with Yahoo Finance API rate limits
