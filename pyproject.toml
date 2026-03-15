@@ -17,3 +17,9 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: Fast isolated logic tests.",
+    "integration: Slower tests that hit disk, database, or network.",
+]
