@@ -78,7 +78,7 @@ def test_sma_crossover_fast_above_slow():
     # ASSERT: Check for the presence of both 0s and then 1s later
     assert 0 in results_df["signal"].values
     
-    # Check that the final state is 0 (we exited)
+    # Check that the final state is 1 (we entered)
     assert results_df["signal"].iloc[-1] == 1
 
 @pytest.mark.unit
