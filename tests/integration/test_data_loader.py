@@ -5,19 +5,26 @@ from muni.data_loader import fetch_data
 from unittest.mock import patch
 
 @pytest.mark.integration
-def test_fetch_data_creates_parquet(tmp_path):
+@patch("muni.data_loader.yf.download")
+def test_fetch_data_creates_parquet(mock_yf_download, tmp_path, create_mock_stock_data):
     ticker = "AAPL"
     save_path = tmp_path / f"{ticker}.parquet"
 
+    # MOCK: Define what yfinance *would* return
+    mock_new_data = create_mock_stock_data(days=30, start="2024-01-01")
+    mock_yf_download.return_value = mock_new_data
+
+    # EXECUTE: Run the function
     df = fetch_data(ticker, data_dir=str(tmp_path))
 
+    # ASSERT: Verify the logic worked
     assert isinstance(df, pd.DataFrame)
     assert os.path.exists(save_path)
     assert not df.empty
 
 @pytest.mark.integration
 @patch("muni.data_loader.yf.download")
-def test_fetch_data_incremental_update(mock_yf_download, tmp_path):
+def test_fetch_data_incremental_update(mock_yf_download, tmp_path, create_mock_stock_data):
     """
     Test that if a parquet file exists, the loader only fetches 
     dates AFTER the last recorded date and combines them correctly.
@@ -27,26 +34,11 @@ def test_fetch_data_incremental_update(mock_yf_download, tmp_path):
     file_path = tmp_path / f"{ticker}.parquet"
     
     # SETUP: Create a fake "existing" Parquet file
-    existing_dates = pd.date_range(start="2024-01-01", end="2024-01-03")
-    existing_data = pd.DataFrame({
-        "Open": [150.0, 151.0, 152.0],
-        "High": [151.0, 152.0, 153.0],
-        "Low": [149.0, 150.0, 151.0],
-        "Close": [150.5, 151.5, 152.5],
-        "Volume": [1000, 1100, 1200]
-    }, index=existing_dates)
-    
+    existing_data = create_mock_stock_data(days=3, start="2024-01-01")
     existing_data.to_parquet(file_path)
 
     # MOCK: Define what yfinance *would* return for the new dates
-    new_dates = pd.date_range(start="2024-01-04", end="2024-01-05")
-    mock_new_data = pd.DataFrame({
-        "Open": [153.0, 154.0],
-        "High": [154.0, 155.0],
-        "Low": [152.0, 153.0],
-        "Close": [153.5, 154.5],
-        "Volume": [1300, 1400]
-    }, index=new_dates)
+    mock_new_data = create_mock_stock_data(days=2, start="2024-01-04")
     
     # Tell our mocked yfinance to return this fake new dataframe
     mock_yf_download.return_value = mock_new_data
