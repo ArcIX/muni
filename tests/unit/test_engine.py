@@ -3,7 +3,7 @@ import pandas as pd
 from muni.engine import BacktestEngine
 
 @pytest.mark.unit
-def test_engine_performance_calculation():
+def test_engine_ten_percent_gain():
     """Test that $10,000 grows correctly with a 10% gain and signal=1."""
     # SETUP: 2 days of data. Price goes from 100 to 110 (10% gain)
     stock_df = pd.DataFrame({
