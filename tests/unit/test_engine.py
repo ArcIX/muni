@@ -20,3 +20,25 @@ def test_engine_ten_percent_gain():
     
     # ASSERT: Final value should be 11,000
     assert results["equity"].iloc[-1] == 11000.0
+
+@pytest.mark.unit
+def test_engine_ten_percent_loss():
+    """Test that $10,000 experiences a 10% loss when price dips"""
+    # SETUP: 2 days of data. Price goes from 100 to 90 (10% loss)
+    stock_df = pd.DataFrame({
+        "Close": [100.0, 90.0]
+    }, index=pd.date_range("2024-01-01", periods=2))
+    
+    # Fake strategy results where we are "Long" on the second day.
+    # Note that no strategy should ever result with these signals
+    # given the scenario. This test case is just to prove that the
+    # calculation works properly
+    stock_with_signals_df = stock_df.copy()
+    stock_with_signals_df["signal"] = [0, 1]
+    
+    # ACTION: Run the engine
+    engine = BacktestEngine(initial_capital=10000.0)
+    results = engine.run(stock_with_signals_df)
+    
+    # ASSERT: Final value should be 9,000
+    assert results["equity"].iloc[-1] == 9000.0
