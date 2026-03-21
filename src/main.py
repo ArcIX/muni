@@ -10,6 +10,8 @@ def run_pipeline(ticker: str, strategy: BaseStrategy, capital: float):
 
     # Load Data
     stocks_df = fetch_data(ticker)
+    if stocks_df.empty:
+        raise ValueError("No data returned")
 
     # Generate Signals
     stocks_with_signals_df = strategy.generate_signals(stocks_df)
