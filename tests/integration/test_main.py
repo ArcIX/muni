@@ -20,3 +20,11 @@ def test_run_pipeline_returns_dataframe(mock_fetch, create_mock_stock_data):
     # ASSERT
     mock_fetch.assert_called_once_with("AAPL")
     assert isinstance(results_df, pd.DataFrame)
+
+@pytest.mark.integration
+@patch("main.fetch_data")
+def test_run_pipeline_handles_empty_data(mock_fetch):
+    mock_fetch.return_value = pd.DataFrame() # Return empty
+    
+    with pytest.raises(ValueError, match="No data returned"):
+        run_pipeline("FAKE", SMACrossover(5, 20), 10000.0)
