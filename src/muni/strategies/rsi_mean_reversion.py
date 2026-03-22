@@ -12,4 +12,34 @@ class RSIMeanReversion(BaseStrategy):
         self.overbought_threshold = overbought_threshold
 
     def generate_signals(self, df: pd.DataFrame):
-        pass
+        data_df = df.copy()
+
+        data_df["delta"] = data_df["Close"].diff()
+        
+        # Calculate the average gain
+        data_df["avg_gain"] = (
+            (data_df["delta"].where(data_df["delta"] > 0, 0))
+            .rolling(window=self.window)
+            .mean()
+        )
+
+        # Calculate the average loss
+        data_df["avg_loss"] = (
+            (-data_df["delta"].where(data_df["delta"] < 0, 0))
+            .rolling(window=self.window)
+            .mean()
+        )
+
+        # Calculate the RS
+        data_df["rs"] = data_df["avg_gain"] / data_df["avg_loss"]
+
+        # Calculate the RSI (Relative Strength Index)
+        data_df["rsi"] = 100 - (100 / (1 + data_df["rs"]))
+
+        # Signals
+        signal_srs = pd.Series(index=data_df.index,  dtype=float)
+        signal_srs[data_df["rsi"] < self.oversold_threshold] =  1
+        signal_srs[data_df["rsi"] > self.overbought_threshold] =  0
+        data_df["signal"] = signal_srs.ffill().shift(1).fillna(0)
+
+        return data_df
