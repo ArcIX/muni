@@ -15,17 +15,25 @@ class RSIMeanReversion(BaseStrategy):
         data_df = df.copy()
 
         data_df["delta"] = data_df["Close"].diff()
-        
+
+        # Gains are the positive deltas.
+        # Turn negative deltas to 0.
+        data_df["gain"] = data_df["delta"].clip(lower=0)
+
         # Calculate the average gain
         data_df["avg_gain"] = (
-            (data_df["delta"].where(data_df["delta"] > 0, 0))
+            data_df["gain"]
             .rolling(window=self.window)
             .mean()
         )
 
+        # Losses are the negative deltas.
+        # Turn positive deltas to 0 and get the absolute value.
+        data_df["loss"] = data_df["delta"].clip(upper=0).abs()
+
         # Calculate the average loss
         data_df["avg_loss"] = (
-            (-data_df["delta"].where(data_df["delta"] < 0, 0))
+            data_df["loss"]
             .rolling(window=self.window)
             .mean()
         )
