@@ -79,3 +79,31 @@ def test_rsi_signal_persistence_and_timing():
     for idx, expected in expected_signals.items():
         actual = results_df['signal'].iloc[idx]
         assert actual == expected, f"Signal mismatch at index {idx}. Expected {expected}, got {actual}"
+
+def test_rsi_signal_persistence_and_timing_mountain_prices():
+    # SETUP: Scenario where the prices rise then dip
+    prices = [100, 110, 120, 130, 110, 90, 70, 80]
+    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=8))
+
+    rsi_mr_strat = RSIMeanReversion(
+        window=3,
+        oversold_threshold=30,
+        overbought_threshold=70
+    )
+
+    # ACTION
+    results_df = rsi_mr_strat.generate_signals(stock_df)
+
+    # ASSERT
+    # Define our "expectation map" (index: expected signal)
+    expected_signals = {
+        3: 0.0,  # Day 4: RSI hits 100 (overbought)
+        4: 0.0,  # Day 5: NEUTRAL
+        5: 0.0,  # Day 6: NEUTRAL (RSI is 20 (oversold), but we can't trade yet (No lookahead!))
+        6: 1.0,  # Day 7: ENTRY (Actioned after Day 6 oversold signal)
+        7: 1.0   # Day 8: HOLD
+    }
+
+    for idx, expected in expected_signals.items():
+        actual = results_df['signal'].iloc[idx]
+        assert actual == expected, f"Signal mismatch at index {idx}. Expected {expected}, got {actual}"
