@@ -31,32 +31,13 @@ def test_rsi_mean_reversion_signal_generation(create_mock_stock_data):
     assert "signal" in results_df.columns
     assert results_df["signal"].iloc[0] == 0
 
-def test_rsi_mean_reversion_valley_prices():
-    # SETUP: Scenario where the prices dip then rise back up
-    prices = [100, 90, 80, 70, 100, 150, 140]
-    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=7))
-
-    rsi_mr_strat = RSIMeanReversion(
-        window=3,
-        oversold_threshold=30,
-        overbought_threshold=70
-    )
-
-    # ACTION
-    results_df = rsi_mr_strat.generate_signals(stock_df)
-
-    # ASSERT: Under the above conditions, we should enter on
-    # the 5th day (index 4) and exit on the 7th day (index 6)
-    assert results_df["signal"].iloc[4] == 1
-    assert results_df["signal"].iloc[6] == 0
-
 @pytest.mark.unit
-def test_rsi_signal_persistence_and_timing():
+def test_rsi_signal_persistence_and_timing_valley_prices():
     """
-    Test the persistence and timing of our long signals.
-    Uses same scenario as in test_rsi_mean_reversion_valley_prices().
+    Test the persistence and timing of our long signals
+    in a 'V-Recovery' scenario
     """
-    # SETUP
+    # SETUP: Scenario where the prices dip then rise back up
     prices = [100, 90, 80, 70, 100, 150, 140]
     stock_df = pd.DataFrame({'Close': prices}, index=pd.date_range("2024-01-01", periods=7))
     
@@ -80,7 +61,12 @@ def test_rsi_signal_persistence_and_timing():
         actual = results_df['signal'].iloc[idx]
         assert actual == expected, f"Signal mismatch at index {idx}. Expected {expected}, got {actual}"
 
+@pytest.mark.unit
 def test_rsi_signal_persistence_and_timing_mountain_prices():
+    """
+    Test the persistence and timing of our long signals
+    in a 'Mountain Peak' scenario
+    """
     # SETUP: Scenario where the prices rise then dip
     prices = [100, 110, 120, 130, 110, 90, 70, 80]
     stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=8))
