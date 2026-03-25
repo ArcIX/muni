@@ -61,3 +61,45 @@ def test_get_performance_summary_returns_dict():
 
     # ASSERT
     assert isinstance(performance, dict)
+
+@pytest.mark.unit
+def test_performance_summary_values_price_goes_up():
+    # SETUP: 2 days of data. Price goes from 100 to 110
+    stock_df = pd.DataFrame({
+        "Close": [100.0, 110.0]
+    }, index=pd.date_range("2024-01-01", periods=2))
+    
+    # Fake strategy results where we are "Long" on the second day
+    stock_with_signals_df = stock_df.copy()
+    stock_with_signals_df["signal"] = [0, 1]
+
+    # ACTION: Run the engine
+    engine = BacktestEngine(initial_capital=10000.0)
+    results_df = engine.run(stock_with_signals_df)
+    performance_dict = engine.get_performance_summary(results_df)
+
+    # ASSERT
+    assert performance_dict["Total Return (%)"] == 10.0
+    assert performance_dict["Max Drawdown (%)"] == 0.0
+    assert performance_dict["Final Value ($)"] == 11000
+
+@pytest.mark.unit
+def test_performance_summary_values_price_goes_down():
+    # SETUP: 3 days of data. Price goes from 100 to 60
+    stock_df = pd.DataFrame({
+        "Close": [100.0, 80.0, 60]
+    }, index=pd.date_range("2024-01-01", periods=3))
+    
+    # Fake strategy results where we are "Long" all 3 days
+    stock_with_signals_df = stock_df.copy()
+    stock_with_signals_df["signal"] = [1, 1, 1]
+
+    # ACTION: Run the engine
+    engine = BacktestEngine(initial_capital=10000.0)
+    results_df = engine.run(stock_with_signals_df)
+    performance_dict = engine.get_performance_summary(results_df)
+
+    # ASSERT
+    assert performance_dict["Total Return (%)"] == -40.0
+    assert performance_dict["Max Drawdown (%)"] == -40.0
+    assert performance_dict["Final Value ($)"] == 6000
