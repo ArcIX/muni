@@ -25,3 +25,25 @@ class BacktestEngine():
         results_df["equity"] = results_df["cumulative_return"] * self.initial_capital
 
         return results_df
+    
+    def get_performance_summary(self, results_df: pd.DataFrame) -> dict:
+        """
+        Returns a dictionary of key performance indicators
+        """
+        # Total Return
+        total_return = (results_df['cumulative_return'].iloc[-1] - 1) * 100
+
+        # Max Drawdown
+        peak = results_df['equity'].cummax()
+        drawdown = (results_df['equity'] - peak) / peak
+        max_drawdown = drawdown.min() * 100
+
+        # Final Equity
+        final_equity = results_df['equity'].iloc[-1]
+
+        performance_dict = {
+            "Total Return (%)": round(total_return, 2),
+            "Max Drawdown (%)": round(max_drawdown, 2),
+            "Final Value ($)": round(final_equity, 2)
+        }
+        return performance_dict
