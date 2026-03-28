@@ -20,6 +20,13 @@ def run_pipeline(ticker: str, strategy: BaseStrategy, capital: float):
     engine = BacktestEngine(initial_capital=capital)
     results_df = engine.run(stocks_with_signals_df)
 
+    # Get Performance Metrics
+    stats = engine.get_performance_summary(results_df)
+
+    print(f"\nRESULTS FOR {ticker} (Strategy: {strategy.__class__.__name__}):")
+    for key, value in stats.items():
+        print(f" - {key}: {value}")
+
     print(
         results_df[[
             "Close",
