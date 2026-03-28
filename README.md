@@ -1,4 +1,4 @@
-# Modular Vectorized Backtester
+# Muni: A Modular Vectorized Backtester
 
 A high-performance, vectorized backtesting framework built in Python for validating quantitative trading strategies against historical equity data. This system is designed with a "Plug-and-Play" architecture, allowing for rapid development and testing of technical analysis indicators while strictly enforcing zero-lookahead bias.
 
@@ -26,17 +26,20 @@ pip install pandas numpy yfinance pyarrow
 ### 2. Running a Backtest
 You can run the full pipeline for any ticker supported by Yahoo Finance:
 ```python
-from backtester.strategies import RSIMeanReversion
+from muni.strategies import RSIMeanReversion
 from main import run_pipeline
+
+# Instantiate the RSI Mean Reversion strategy
+rsi_strat = RSIMeanReversion(window=14)
 
 # Run RSI Mean Reversion on Apple (AAPL)
 results = run_pipeline(
     ticker="AAPL",
-    strategy_class=RSIMeanReversion,
-    strategy_params={"window": 14, "oversold_threshold": 30.0}
+    strategy=rsi_strat,
+    capital=10000.0
 )
 
-print(f"Final Portfolio Value: ${results['final_value']:.2f}")
+print(f"Final Portfolio Value: ${results_df['equity'].iloc[-1]:.2f}")
 ```
 
 ## Testing Suite
