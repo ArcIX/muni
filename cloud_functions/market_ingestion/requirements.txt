@@ -1,0 +1,5 @@
+functions-framework==3.*
+yfinance==1.2.*
+pandas==2.*
+pyarrow==23.*
+google-cloud-storage==2.*
