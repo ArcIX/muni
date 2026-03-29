@@ -3,6 +3,7 @@ import pandas as pd
 from google.cloud import storage
 import functions_framework
 import io
+from datetime import datetime, timedelta
 
 BRONZE_BUCKET_NAME = "muni-bronze-us-east1"
 
@@ -25,19 +26,39 @@ def ingest_market_data(request):
     # Parse the ticker from the trigger request (Default to AAPL)
     request_json = request.get_json(silent=True)
     request_args = request.args
+
     ticker_symbol = "AAPL"
-    
     if request_json and 'ticker' in request_json:
         ticker_symbol = request_json['ticker']
     elif request_args and 'ticker' in request_args:
         ticker_symbol = request_args['ticker']
 
+    # Parse the start_date and end_date from the trigger request
+    # (Default to today and 30 days ago)
+    end_date_obj = datetime.today()
+    end_date = end_date_obj.strftime("%Y-%m-%d")
+    if request_json and 'end_date' in request_json:
+        end_date = request_json['end_date']
+    elif request_args and 'end_date' in request_args:
+        end_date = request_args['end_date']
+
+    start_date_obj = end_date_obj - timedelta(days=30)
+    start_date = start_date_obj.strftime("%Y-%m-%d")
+    if request_json and 'start_date' in request_json:
+        start_date = request_json['start_date']
+    elif request_args and 'start_date' in request_args:
+        start_date = request_args['start_date']
+
+    if start_date > end_date:
+        return f"Invalid date range: {start_date} to {end_date}", 400
+
     print(f"Starting ingestion for {ticker_symbol}...")
+    print(f"From {start_date} to {end_date}...")
 
     try:
-        # Fetch max historical data
+        # Fetch historical data
         ticker = yf.Ticker(ticker_symbol)
-        df = ticker.history(period="max")
+        df = ticker.history(start=start_date, end=end_date)
         
         if df.empty:
             return f"No data found for {ticker_symbol}", 404
