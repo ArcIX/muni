@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 import io
+from google.api_core.exceptions import Forbidden
 from cloud_functions.market_ingestion.main import ingest_market_data
 
 def test_ingest_valid_ticker(create_mock_stock_data):
@@ -120,3 +121,41 @@ def test_ingest_missing_ticker(mock_ticker, mock_get_client, create_mock_stock_d
         
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_data):
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {"ticker": "AAPL"}
+
+    # Fake yfinance behavior
+    mock_df = create_mock_stock_data(days=2)
+        
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_storage.bucket.side_effect = Forbidden("Access Denied")
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    # ASSERT
+    # Did the function return 500?
+    # Note: Storage client will return 403,
+    # but the function should return 500 as
+    # it represents an internal server error
+    assert status_code == 500
+    # Ensure the exception details were captured in the return string
+    assert "403" in response
+    assert "Access Denied" in response
+
+    # In this scenario, the upload method should not have been called
+    mock_blob.upload_from_string.assert_not_called()
