@@ -154,3 +154,52 @@ def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_dat
     # Ensure the exception details were captured in the return string
     assert "403" in response
     assert "Access Denied" in response
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_history_with_date_range(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL",
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    # ASSERT
+    # Did the function return a success code?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it download based on start and end dates?
+    mock_ticker_instance.history.assert_called_once_with(
+        start=start_date, end=end_date
+    )
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
