@@ -141,8 +141,6 @@ def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_dat
     mock_storage = MagicMock()
     mock_get_client.return_value = mock_storage
     mock_storage.bucket.side_effect = Forbidden("Access Denied")
-    mock_bucket = mock_storage.bucket.return_value
-    mock_blob = mock_bucket.blob.return_value
 
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -156,6 +154,3 @@ def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_dat
     # Ensure the exception details were captured in the return string
     assert "403" in response
     assert "Access Denied" in response
-
-    # In this scenario, the upload method should not have been called
-    mock_blob.upload_from_string.assert_not_called()
