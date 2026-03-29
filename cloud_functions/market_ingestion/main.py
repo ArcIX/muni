@@ -6,9 +6,17 @@ import io
 
 BRONZE_BUCKET_NAME = "muni-bronze-us-east1"
 
-# Initialize the GCS client outside the function for "warm start" performance
+# This lives in the global memory space of the "warm" instance
+_STORAGE_CLIENT = None
+
+# Lazy Singleton for the storage client
 def get_storage_client():
-    return storage.Client()
+    global _STORAGE_CLIENT
+    
+    if _STORAGE_CLIENT is None:
+        _STORAGE_CLIENT = storage.Client()
+
+    return _STORAGE_CLIENT
 
 @functions_framework.http
 def ingest_market_data(request):
