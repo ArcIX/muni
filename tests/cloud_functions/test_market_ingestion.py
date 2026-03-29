@@ -79,3 +79,44 @@ def test_ingest_invalid_ticker(mock_ticker, mock_get_client):
 
     # In this scenario,the upload method should not have been called
     mock_blob.upload_from_string.assert_not_called()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_ingest_missing_ticker(mock_ticker, mock_get_client, create_mock_stock_data):
+    """
+    Test that an ticker defaults to AAPL if no ticker is provided.
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {}
+    
+    # yfinance will return an empty DataFrame
+    mock_df = create_mock_stock_data(days=2)
+        
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    # ASSERT
+    # Did the function return 404?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it actually default to AAPL?
+    mock_ticker.assert_called_once_with("AAPL")
+
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+        
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
