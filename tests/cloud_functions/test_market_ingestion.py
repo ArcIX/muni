@@ -43,3 +43,39 @@ def test_ingest_valid_ticker(create_mock_stock_data):
         
         # Did it call the upload method?
         mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_ingest_invalid_ticker(mock_ticker, mock_get_client):
+    """
+    Test that an invalid ticker request triggers a 404.
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {"ticker": "UNKNOWN"}
+    
+    # yfinance will return an empty DataFrame
+    mock_df = pd.DataFrame()
+        
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    # ASSERT
+    # Did the function return 404?
+    assert status_code == 404
+    assert "UNKNOWN" in response
+    assert "No data found" in response
+
+    # In this scenario,the upload method should not have been called
+    mock_blob.upload_from_string.assert_not_called()
