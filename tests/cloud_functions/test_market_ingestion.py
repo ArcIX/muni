@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 import io
+from datetime import datetime, timedelta
 from google.api_core.exceptions import Forbidden
 from cloud_functions.market_ingestion.main import ingest_market_data
 
@@ -188,6 +189,61 @@ def test_history_with_date_range(
     # ACT
     response, status_code = ingest_market_data(mock_request)
     
+    # ASSERT
+    # Did the function return a success code?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it download based on start and end dates?
+    mock_ticker_instance.history.assert_called_once_with(
+        start=start_date, end=end_date
+    )
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_end_date_without_start_date(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    """
+    Test that providing an end date without a start date defaults the 
+    start date to 30 days prior.
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    end_date = "2020-01-31"
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL",
+        "end_date": end_date
+    }
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    # Start date should default to 30 days prior
+    start_date = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    print(response)
+
     # ASSERT
     # Did the function return a success code?
     assert status_code == 200
