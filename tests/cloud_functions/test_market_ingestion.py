@@ -14,6 +14,7 @@ def test_ingest_valid_ticker(create_mock_stock_data):
     # Mock the incoming HTTP request from Google Cloud Functions
     mock_request = MagicMock()
     mock_request.get_json.return_value = {"ticker": "AAPL"}
+    mock_request.args = {}
     
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=2)
@@ -56,6 +57,7 @@ def test_ingest_invalid_ticker(mock_ticker, mock_get_client):
     # Mock the incoming HTTP request from Google Cloud Functions
     mock_request = MagicMock()
     mock_request.get_json.return_value = {"ticker": "UNKNOWN"}
+    mock_request.args = {}
     
     # yfinance will return an empty DataFrame
     mock_df = pd.DataFrame()
@@ -92,6 +94,7 @@ def test_ingest_missing_ticker(mock_ticker, mock_get_client, create_mock_stock_d
     # Mock the incoming HTTP request from Google Cloud Functions
     mock_request = MagicMock()
     mock_request.get_json.return_value = {}
+    mock_request.args = {}
     
     # yfinance will return an empty DataFrame
     mock_df = create_mock_stock_data(days=2)
@@ -130,6 +133,7 @@ def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_dat
     # Mock the incoming HTTP request from Google Cloud Functions
     mock_request = MagicMock()
     mock_request.get_json.return_value = {"ticker": "AAPL"}
+    mock_request.args = {}
 
     # Fake yfinance behavior
     mock_df = create_mock_stock_data(days=2)
@@ -172,6 +176,7 @@ def test_history_with_date_range(
         "start_date": start_date,
         "end_date": end_date,
     }
+    mock_request.args = {}
     
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=31, start=start_date)
@@ -223,10 +228,13 @@ def test_end_date_without_start_date(
         "ticker": "AAPL",
         "end_date": end_date
     }
+    mock_request.args = {}
     
     # Create a dummy DataFrame to simulate yfinance data
     # Start date should default to 30 days prior
-    start_date = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)
+    start_date = (
+        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)
+    ).strftime("%Y-%m-%d")
     mock_df = create_mock_stock_data(days=31, start=start_date)
     
     # Setup the fake yfinance behavior

@@ -35,21 +35,21 @@ def ingest_market_data(request):
 
     # Parse the start_date and end_date from the trigger request
     # (Default to today and 30 days ago)
-    end_date_obj = datetime.today()
-    end_date = end_date_obj.strftime("%Y-%m-%d")
-    if request_json and 'end_date' in request_json:
-        end_date = request_json['end_date']
-    elif request_args and 'end_date' in request_args:
-        end_date = request_args['end_date']
+    end_date = (request_json or {}).get('end_date') or (request_args or {}).get('end_date')
+    if end_date:
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+    else:
+        end_date_obj = datetime.today()
+        end_date = end_date_obj.strftime("%Y-%m-%d")
+    
+    start_date = (request_json or {}).get('start_date') or (request_args or {}).get('start_date')
+    if start_date:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+    else:
+        start_date_obj = end_date_obj - timedelta(days=30)
+        start_date = start_date_obj.strftime("%Y-%m-%d")
 
-    start_date_obj = end_date_obj - timedelta(days=30)
-    start_date = start_date_obj.strftime("%Y-%m-%d")
-    if request_json and 'start_date' in request_json:
-        start_date = request_json['start_date']
-    elif request_args and 'start_date' in request_args:
-        start_date = request_args['start_date']
-
-    if start_date > end_date:
+    if start_date_obj > end_date_obj:
         return f"Invalid date range: {start_date} to {end_date}", 400
 
     print(f"Starting ingestion for {ticker_symbol}...")
