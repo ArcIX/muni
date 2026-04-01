@@ -267,3 +267,64 @@ def test_end_date_without_start_date(
     
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_blob_file_path(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    """
+    Test that blob file path is constructed correctly
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    ticker = "AAPL"
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+
+    start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+    year = start_date_obj.year
+    month = start_date_obj.month
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": ticker,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+    mock_request.args = {}
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_get_blob = mock_bucket.blob
+    mock_blob = mock_get_blob.return_value
+    
+    file_path = (
+        f"raw_market_data"
+        f"/ticker={ticker}"
+        f"/year={year}"
+        f"/month={month}"
+        f"/history.parquet"
+    )
+
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+
+    # ASSERT
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+
+    mock_get_blob.assert_called_with(file_path)
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
