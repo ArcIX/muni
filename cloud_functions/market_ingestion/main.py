@@ -73,8 +73,17 @@ def ingest_market_data(request):
         # Upload to Google Cloud Storage
         bucket = get_storage_client().bucket(BRONZE_BUCKET_NAME)
         
-        # We partition by ticker to keep the data lake organized
-        file_path = f"raw_market_data/ticker={ticker_symbol}/history.parquet"
+        # We partition by ticker, year, and month to keep the data lake organized
+        year = start_date_obj.year
+        month = start_date_obj.month
+
+        file_path = (
+            f"raw_market_data"
+            f"/ticker={ticker_symbol}"
+            f"/year={year}"
+            f"/month={month}"
+            f"/history.parquet"
+        )
         blob = bucket.blob(file_path)
         
         blob.upload_from_string(
