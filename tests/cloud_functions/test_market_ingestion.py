@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import io
 from datetime import datetime, timedelta
+import calendar
 from google.api_core.exceptions import Forbidden
 from cloud_functions.market_ingestion.main import ingest_market_data
 
@@ -217,11 +218,12 @@ def test_end_date_without_start_date(
 ):
     """
     Test that providing an end date without a start date defaults the 
-    start date to 30 days prior.
+    start date to the first of the month and overwrites the end date
+    to the last day of the month
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
-    end_date = "2020-01-31"
+    end_date = "2020-01-28"
 
     mock_request = MagicMock()
     mock_request.get_json.return_value = {
@@ -229,12 +231,221 @@ def test_end_date_without_start_date(
         "end_date": end_date
     }
     mock_request.args = {}
-    
-    # Create a dummy DataFrame to simulate yfinance data
-    # Start date should default to 30 days prior
+
+    base_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+
+    # Start date should default to first of the month
+    # based on the end date
     start_date = (
-        datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=30)
+        base_date_obj.replace(day=1)
     ).strftime("%Y-%m-%d")
+
+    # End date should become the last day of the month
+    year = base_date_obj.year
+    month = base_date_obj.month
+    _, last_day = calendar.monthrange(year, month)
+    end_date = datetime(year, month, last_day).strftime("%Y-%m-%d")
+
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    print(response)
+
+    # ASSERT
+    # Did the function return a success code?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it download based on start and end dates?
+    mock_ticker_instance.history.assert_called_once_with(
+        start=start_date, end=end_date
+    )
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_start_date_without_end_date(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    """
+    Test that providing a start date without an end date defaults the 
+    end date to the last day of the month and overwrites the start date
+    to the first of the month
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    start_date = "2020-01-05"
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL",
+        "start_date": start_date
+    }
+    mock_request.args = {}
+    
+    base_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+
+    # Start date should become the first of the month
+    start_date = (
+        base_date_obj.replace(day=1)
+    ).strftime("%Y-%m-%d")
+
+    # End date should default to the last day of the month
+    year = base_date_obj.year
+    month = base_date_obj.month
+    _, last_day = calendar.monthrange(year, month)
+    end_date = datetime(year, month, last_day).strftime("%Y-%m-%d")
+
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    print(response)
+
+    # ASSERT
+    # Did the function return a success code?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it download based on start and end dates?
+    mock_ticker_instance.history.assert_called_once_with(
+        start=start_date, end=end_date
+    )
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.datetime")
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_no_start_date_and_end_date(
+    mock_ticker, mock_get_client, mock_dt, create_mock_stock_data
+):
+    """
+    Test that providing no start and end date defaults the 
+    start date to the first of the month and end date to
+    yesterday (month to date)
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL"
+    }
+    mock_request.args = {}
+    
+    today_date_obj = datetime(2020, 1, 5).date()
+    mock_dt.today.return_value = today_date_obj
+
+    # Start date should default to first of the month
+    start_date = (
+        today_date_obj.replace(day=1)
+    ).strftime("%Y-%m-%d")
+
+    # End date should become yesterday
+    end_date = (today_date_obj - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=4, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+    
+    print(response)
+
+    # ASSERT
+    # Did the function return a success code?
+    assert status_code == 200
+    assert "Success" in response
+
+    # Did it download based on start and end dates?
+    mock_ticker_instance.history.assert_called_once_with(
+        start=start_date, end=end_date
+    )
+    
+    # Did it actually attempt to talk to Google Cloud Storage?
+    mock_storage.bucket.assert_called_with("muni-bronze-us-east1")
+    
+    # Did it call the upload method?
+    mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.datetime")
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_no_start_date_and_end_date_first_of_month(
+    mock_ticker, mock_get_client, mock_dt, create_mock_stock_data
+):
+    """
+    Test that providing no start and end date when its the first day of
+    the month defaults the start date to the FIRST of the PREVIOUS month
+    and end date to yesterday
+    """
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL"
+    }
+    mock_request.args = {}
+    
+    today_date_obj = datetime(2020, 1, 1)
+    mock_dt.side_effect = lambda *args, **kw: datetime(*args, **kw)
+    mock_dt.today.return_value = today_date_obj
+
+    # End date should become yesterday
+    end_date = (today_date_obj - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Start date should default to first of the PREVIOUS month
+    start_date = (
+        (today_date_obj - timedelta(days=1)).replace(day=1)
+    ).strftime("%Y-%m-%d")
+
+    # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=31, start=start_date)
     
     # Setup the fake yfinance behavior
