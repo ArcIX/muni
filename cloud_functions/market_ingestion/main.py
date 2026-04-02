@@ -4,6 +4,8 @@ from google.cloud import storage
 import functions_framework
 import io
 from datetime import datetime, timedelta
+import os
+import calendar
 
 BRONZE_BUCKET_NAME = "muni-bronze-us-east1"
 
@@ -18,6 +20,33 @@ def get_storage_client():
         _STORAGE_CLIENT = storage.Client()
 
     return _STORAGE_CLIENT
+
+def get_mtd_dates():
+    """
+    Calculates the 1st of the current month and yesterday's date.
+    mtd = month to date
+    """
+    today = datetime.today()
+    # The 1st of this month
+    first_of_month = today.replace(day=1)
+    # Yesterday
+    yesterday = today - timedelta(days=1)
+    
+    return first_of_month, yesterday
+
+def get_start_and_end_of_month_dates(base_date_obj: datetime):
+    """
+    Calculates the start and end of the month from the base date.
+    """
+    # The 1st of the month
+    first_of_month = base_date_obj.replace(day=1)
+    # The last day of the month
+    year = base_date_obj.year
+    month = base_date_obj.month
+    _, last_day = calendar.monthrange(year, month)
+    end_of_month = datetime(year, month, last_day)
+
+    return first_of_month, end_of_month
 
 @functions_framework.http
 def ingest_market_data(request):
@@ -34,20 +63,37 @@ def ingest_market_data(request):
         ticker_symbol = request_args['ticker']
 
     # Parse the start_date and end_date from the trigger request
-    # (Default to today and 30 days ago)
-    end_date = (request_json or {}).get('end_date') or (request_args or {}).get('end_date')
-    if end_date:
-        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
-    else:
-        end_date_obj = datetime.today()
-        end_date = end_date_obj.strftime("%Y-%m-%d")
-    
     start_date = (request_json or {}).get('start_date') or (request_args or {}).get('start_date')
-    if start_date:
+    end_date = (request_json or {}).get('end_date') or (request_args or {}).get('end_date')
+
+    # If both start_date and end_date are provided, use them
+    if start_date and end_date:
         start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-    else:
-        start_date_obj = end_date_obj - timedelta(days=30)
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+    # Default values:
+    # If either only start_date or only end_date is provided, use:
+    #   start_date = first of the month of start_date/end_date
+    #   end_date = end of the month of start_date/end_date
+    elif (start_date and not end_date) or (end_date and not start_date):
+        base_date = start_date or end_date
+        start_date_obj, end_date_obj = get_start_and_end_of_month_dates(
+            datetime.strptime(base_date, "%Y-%m-%d")
+        )
         start_date = start_date_obj.strftime("%Y-%m-%d")
+        end_date = end_date_obj.strftime("%Y-%m-%d")
+    # If neither start_date nor end_date are provided, use month to date
+    else:
+        start_date_obj, end_date_obj = get_mtd_dates()
+
+        # Handle the 1st-of-month transition
+        if start_date_obj > end_date_obj:
+            # On the 1st, we want the final full sync of the PREVIOUS months
+            start_date_obj, end_date_obj = get_start_and_end_of_month_dates(end_date_obj)
+
+    # Update the date strings based on what we calculated
+    # from above if statements
+    start_date = start_date_obj.strftime("%Y-%m-%d")
+    end_date = end_date_obj.strftime("%Y-%m-%d")
 
     if start_date_obj > end_date_obj:
         return f"Invalid date range: {start_date} to {end_date}", 400
