@@ -9,7 +9,25 @@ from datetime import datetime, timedelta
 import calendar
 from google.api_core.exceptions import Forbidden
 import pyarrow.parquet as pq
-from cloud_functions.market_ingestion.main import ingest_market_data
+from cloud_functions.market_ingestion.main import (
+    ingest_market_data, get_mtd_dates, get_start_and_end_of_month_dates
+)
+
+@patch("cloud_functions.market_ingestion.main.datetime")
+def test_mtd_end_date_is_tomorrow(mock_dt):
+    # SETUP
+    mock_dt.today.return_value = datetime(2026, 4, 3)
+
+    # ACTION
+    start, end = get_mtd_dates()
+    
+    # ASSERT
+    # Assert that end is strictly greater than start
+    assert end > start, "End date must be after start date for yfinance exclusivity"
+    
+    # If today is April 3rd, start should be April 1st and end should be April 3rd
+    assert start.day == 1
+    assert end.day == 4
 
 def test_ingest_valid_ticker(create_mock_stock_data):
     """
