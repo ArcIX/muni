@@ -121,9 +121,10 @@ def ingest_market_data(request):
         # Upload to Google Cloud Storage
         bucket = get_storage_client().bucket(BRONZE_BUCKET_NAME)
         
-        # We partition by ticker, year, and month to keep the data lake organized
-        year = start_date_obj.year
-        month = start_date_obj.month
+        # We partition by ticker, year, and month (zero padded) to keep the 
+        # data lake organized and easy to query
+        year = start_date_obj.strftime("%Y")
+        month = start_date_obj.strftime("%m")
 
         file_path = (
             f"raw_market_data"
