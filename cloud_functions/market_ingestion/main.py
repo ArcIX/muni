@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 import os
 import calendar
 
-BRONZE_BUCKET_NAME = "muni-bronze-us-east1"
+BRONZE_BUCKET_NAME = os.environ.get("BRONZE_BUCKET_NAME")
+if not BRONZE_BUCKET_NAME:
+    raise RuntimeError("The BRONZE_BUCKET_NAME environment variable is not set.")
 
 # This lives in the global memory space of the "warm" instance
 _STORAGE_CLIENT = None
