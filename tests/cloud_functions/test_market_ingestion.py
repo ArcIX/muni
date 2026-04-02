@@ -8,6 +8,7 @@ import io
 from datetime import datetime, timedelta
 import calendar
 from google.api_core.exceptions import Forbidden
+import pyarrow.parquet as pq
 from cloud_functions.market_ingestion.main import ingest_market_data
 
 def test_ingest_valid_ticker(create_mock_stock_data):
@@ -586,3 +587,48 @@ def test_history_contains_adjusted_close(
     
     # ASSERT
     assert "Adj Close" in results_df.columns, "Adj Close column is missing!"
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_history_date_is_date_type(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL",
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    mock_request.args = {}
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+
+    # Grab the data that was sent to the upload mock
+    args, kwargs = mock_blob.upload_from_string.call_args
+    uploaded_bytes = args[0]
+    # Read it back into a parquet table to avoid finicky data type issues
+    # for Date column
+    results_tbl = pq.read_table(io.BytesIO(uploaded_bytes))
+    date_field = results_tbl.schema.field("Date")
+    
+    # ASSERT
+    assert str(date_field.type) == "date32[day]", f"Expected date32[day], got {date_field.type}"
