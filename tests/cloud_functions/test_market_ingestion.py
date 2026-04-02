@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import calendar
 from google.api_core.exceptions import Forbidden
 import pyarrow.parquet as pq
+from dateutil.relativedelta import relativedelta
 from cloud_functions.market_ingestion.main import (
     ingest_market_data, get_mtd_dates, get_start_and_end_of_month_dates
 )
@@ -241,7 +242,7 @@ def test_end_date_without_start_date(
     """
     Test that providing an end date without a start date defaults the 
     start date to the first of the month and overwrites the end date
-    to the last day of the month
+    to the first of the next month
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -262,11 +263,10 @@ def test_end_date_without_start_date(
         base_date_obj.replace(day=1)
     ).strftime("%Y-%m-%d")
 
-    # End date should become the last day of the month
-    year = base_date_obj.year
-    month = base_date_obj.month
-    _, last_day = calendar.monthrange(year, month)
-    end_date = datetime(year, month, last_day).strftime("%Y-%m-%d")
+    # End date should become the first day of the next month
+    end_date = (
+        base_date_obj.replace(day=1) + relativedelta(months=1)
+    ).strftime("%Y-%m-%d")
 
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=31, start=start_date)
@@ -309,8 +309,8 @@ def test_start_date_without_end_date(
 ):
     """
     Test that providing a start date without an end date defaults the 
-    end date to the last day of the month and overwrites the start date
-    to the first of the month
+    end date to the first of the next month and overwrites the start 
+    date to the first of the month
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -330,11 +330,10 @@ def test_start_date_without_end_date(
         base_date_obj.replace(day=1)
     ).strftime("%Y-%m-%d")
 
-    # End date should default to the last day of the month
-    year = base_date_obj.year
-    month = base_date_obj.month
-    _, last_day = calendar.monthrange(year, month)
-    end_date = datetime(year, month, last_day).strftime("%Y-%m-%d")
+    # End date should default to the first day of the next month
+    end_date = (
+        base_date_obj.replace(day=1) + relativedelta(months=1)
+    ).strftime("%Y-%m-%d")
 
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=31, start=start_date)
@@ -379,7 +378,7 @@ def test_no_start_date_and_end_date(
     """
     Test that providing no start and end date defaults the 
     start date to the first of the month and end date to
-    yesterday (month to date)
+    tomorrow (month to date)
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -398,8 +397,8 @@ def test_no_start_date_and_end_date(
         today_date_obj.replace(day=1)
     ).strftime("%Y-%m-%d")
 
-    # End date should become yesterday
-    end_date = (today_date_obj - timedelta(days=1)).strftime("%Y-%m-%d")
+    # End date should become tomorrow
+    end_date = (today_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=4, start=start_date)
@@ -443,8 +442,7 @@ def test_no_start_date_and_end_date_first_of_month(
 ):
     """
     Test that providing no start and end date when its the first day of
-    the month defaults the start date to the FIRST of the PREVIOUS month
-    and end date to yesterday
+    the month defaults the start date to today and end date to tomorrow
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -459,13 +457,11 @@ def test_no_start_date_and_end_date_first_of_month(
     mock_dt.side_effect = lambda *args, **kw: datetime(*args, **kw)
     mock_dt.today.return_value = today_date_obj
 
-    # End date should become yesterday
-    end_date = (today_date_obj - timedelta(days=1)).strftime("%Y-%m-%d")
+    # End date should become tomorrow
+    end_date = (today_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Start date should default to first of the PREVIOUS month
-    start_date = (
-        (today_date_obj - timedelta(days=1)).replace(day=1)
-    ).strftime("%Y-%m-%d")
+    # Start date should default to today
+    start_date = today_date_obj.strftime("%Y-%m-%d")
 
     # Create a dummy DataFrame to simulate yfinance data
     mock_df = create_mock_stock_data(days=31, start=start_date)

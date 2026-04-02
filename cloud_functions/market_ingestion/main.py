@@ -6,6 +6,7 @@ import io
 from datetime import datetime, timedelta
 import os
 import calendar
+from dateutil.relativedelta import relativedelta
 
 BRONZE_BUCKET_NAME = os.environ.get("BRONZE_BUCKET_NAME")
 if not BRONZE_BUCKET_NAME:
@@ -25,31 +26,28 @@ def get_storage_client():
 
 def get_mtd_dates():
     """
-    Calculates the 1st of the current month and yesterday's date.
+    Calculates the 1st of the current month and tomorrow's date
+    to account for the end date exclusivity of yfinance
     mtd = month to date
     """
     today = datetime.today()
     # The 1st of this month
     first_of_month = today.replace(day=1)
-    # Yesterday
-    yesterday = today - timedelta(days=1)
+    # Tomorrow
+    tomorrow = today + timedelta(days=1)
     
-    return first_of_month, yesterday
+    return first_of_month, tomorrow
 
 def get_start_and_end_of_month_dates(base_date_obj: datetime):
     """
-    Calculates the start and end of the month from the base date.
+    Calculates the start of the month and the next month from the base date.
     """
     # The 1st of the month
     first_of_month = base_date_obj.replace(day=1)
-    # The last day of the month
-    year = base_date_obj.year
-    month = base_date_obj.month
-    _, last_day = calendar.monthrange(year, month)
-    end_of_month = datetime(year, month, last_day)
+    # The 1st of the next month
+    first_of_next_month = first_of_month + relativedelta(months=1)
 
-    return first_of_month, end_of_month
-
+    return first_of_month, first_of_next_month
 @functions_framework.http
 def ingest_market_data(request):
     """HTTP Cloud Function to fetch yfinance data and save to GCS."""
@@ -86,11 +84,6 @@ def ingest_market_data(request):
     # If neither start_date nor end_date are provided, use month to date
     else:
         start_date_obj, end_date_obj = get_mtd_dates()
-
-        # Handle the 1st-of-month transition
-        if start_date_obj > end_date_obj:
-            # On the 1st, we want the final full sync of the PREVIOUS months
-            start_date_obj, end_date_obj = get_start_and_end_of_month_dates(end_date_obj)
 
     # Update the date strings based on what we calculated
     # from above if statements
