@@ -20,6 +20,7 @@ def create_mock_stock_data():
             "High": close_prices + 1.0,
             "Low": close_prices - 1.5,
             "Close": close_prices,
+            "Adj Close": close_prices * 1.1,
             "Volume": np.random.randint(1000, 5000, size=days).astype(float)
         }
         
