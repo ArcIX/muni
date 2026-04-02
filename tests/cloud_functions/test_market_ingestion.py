@@ -205,7 +205,7 @@ def test_history_with_date_range(
 
     # Did it download based on start and end dates?
     mock_ticker_instance.history.assert_called_once_with(
-        start=start_date, end=end_date
+        start=start_date, end=end_date,  auto_adjust=False
     )
     
     # Did it actually attempt to talk to Google Cloud Storage?
@@ -274,7 +274,7 @@ def test_end_date_without_start_date(
 
     # Did it download based on start and end dates?
     mock_ticker_instance.history.assert_called_once_with(
-        start=start_date, end=end_date
+        start=start_date, end=end_date, auto_adjust=False
     )
     
     # Did it actually attempt to talk to Google Cloud Storage?
@@ -342,7 +342,7 @@ def test_start_date_without_end_date(
 
     # Did it download based on start and end dates?
     mock_ticker_instance.history.assert_called_once_with(
-        start=start_date, end=end_date
+        start=start_date, end=end_date, auto_adjust=False
     )
     
     # Did it actually attempt to talk to Google Cloud Storage?
@@ -407,7 +407,7 @@ def test_no_start_date_and_end_date(
 
     # Did it download based on start and end dates?
     mock_ticker_instance.history.assert_called_once_with(
-        start=start_date, end=end_date
+        start=start_date, end=end_date, auto_adjust=False
     )
     
     # Did it actually attempt to talk to Google Cloud Storage?
@@ -473,7 +473,7 @@ def test_no_start_date_and_end_date_first_of_month(
 
     # Did it download based on start and end dates?
     mock_ticker_instance.history.assert_called_once_with(
-        start=start_date, end=end_date
+        start=start_date, end=end_date, auto_adjust=False
     )
     
     # Did it actually attempt to talk to Google Cloud Storage?
@@ -543,3 +543,46 @@ def test_blob_file_path(
     
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_history_contains_adjusted_close(
+    mock_ticker, mock_get_client, create_mock_stock_data
+):
+    # SETUP
+    # Mock the incoming HTTP request from Google Cloud Functions
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL",
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    mock_request.args = {}
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_client.return_value = mock_storage
+    mock_bucket = mock_storage.bucket.return_value
+    mock_blob = mock_bucket.blob.return_value
+    
+    # ACT
+    response, status_code = ingest_market_data(mock_request)
+
+    # Grab the data that was sent to the upload mock
+    args, kwargs = mock_blob.upload_from_string.call_args
+    uploaded_bytes = args[0]
+    # Read it back into a DataFrame to inspect the "contract"
+    results_df = pd.read_parquet(io.BytesIO(uploaded_bytes))
+    
+    # ASSERT
+    assert "Adj Close" in results_df.columns, "Adj Close column is missing!"
