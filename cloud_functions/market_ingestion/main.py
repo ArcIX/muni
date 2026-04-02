@@ -106,7 +106,7 @@ def ingest_market_data(request):
     try:
         # Fetch historical data
         ticker = yf.Ticker(ticker_symbol)
-        df = ticker.history(start=start_date, end=end_date)
+        df = ticker.history(start=start_date, end=end_date, auto_adjust=False)
         
         if df.empty:
             return f"No data found for {ticker_symbol}", 404
