@@ -489,6 +489,7 @@ def test_blob_file_path(
 ):
     """
     Test that blob file path is constructed correctly
+    (month must be zero padded)
     """
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -497,8 +498,8 @@ def test_blob_file_path(
     end_date = "2020-01-31"
 
     start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-    year = start_date_obj.year
-    month = start_date_obj.month
+    year_str = start_date_obj.strftime("%Y")
+    month_str = start_date_obj.strftime("%m")
 
     mock_request = MagicMock()
     mock_request.get_json.return_value = {
@@ -525,8 +526,8 @@ def test_blob_file_path(
     file_path = (
         f"raw_market_data"
         f"/ticker={ticker}"
-        f"/year={year}"
-        f"/month={month}"
+        f"/year={year_str}"
+        f"/month={month_str}"
         f"/history.parquet"
     )
 
