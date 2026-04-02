@@ -113,6 +113,7 @@ def ingest_market_data(request):
             
         # Clean up the index so 'Date' is a normal column
         df.reset_index(inplace=True)
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
         
         # Convert DataFrame to a Parquet file in memory (no local disk needed)
         parquet_buffer = io.BytesIO()
