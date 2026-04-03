@@ -30,6 +30,55 @@ def test_mtd_end_date_is_tomorrow(mock_dt):
     assert start.day == 1
     assert end.day == 4
 
+@patch("cloud_functions.market_ingestion.main.datetime")
+def test_ingestion_range_end_date_is_2nd(mock_dt):
+    # SETUP
+    mock_dt.today.return_value = datetime(2026, 4, 1)
+
+    # ACTION
+    start, end = get_ingestion_range()
+    
+    # ASSERT
+    # Assert that end is strictly greater than start
+    assert end > start, "End date must be after start date for yfinance exclusivity"
+    
+    # If today is April 1st, start should be April 1st and end should be April 2nd
+    assert start == datetime(2026, 4, 1)
+    assert end == datetime(2026, 4, 2)
+
+@patch("cloud_functions.market_ingestion.main.datetime")
+def test_ingestion_range_end_date_is_1st_of_next_month(mock_dt):
+    # SETUP
+    mock_dt.today.return_value = datetime(2026, 3, 31)
+
+    # ACTION
+    start, end = get_ingestion_range()
+    
+    # ASSERT
+    # Assert that end is strictly greater than start
+    assert end > start, "End date must be after start date for yfinance exclusivity"
+    
+    # If today is March 31st, start should be March 1st and end should be April 1st
+    assert start == datetime(2026, 3, 1)
+    assert end == datetime(2026, 4, 1)
+
+@patch("cloud_functions.market_ingestion.main.datetime")
+def test_ingestion_range_end_date_is_1st_of_next_year(mock_dt):
+    # SETUP
+    mock_dt.today.return_value = datetime(2025, 12, 31)
+
+    # ACTION
+    start, end = get_ingestion_range()
+    
+    # ASSERT
+    # Assert that end is strictly greater than start
+    assert end > start, "End date must be after start date for yfinance exclusivity"
+    
+    # If today is December 31st, start should be December 1st and end should be Jan 1st
+    # of next year
+    assert start == datetime(2025, 12, 1)
+    assert end == datetime(2026, 1, 1)
+
 def test_ingest_valid_ticker(create_mock_stock_data):
     """
     Test that a valid ticker request triggers a fetch and a storage upload.
