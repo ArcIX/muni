@@ -79,6 +79,21 @@ def test_ingestion_range_end_date_is_1st_of_next_year(mock_dt):
     assert start == datetime(2025, 12, 1)
     assert end == datetime(2026, 1, 1)
 
+def test_full_month_ingestion_range_end_date_is_1st_of_next_month():
+    # SETUP
+    base_date_obj = datetime(2026, 4, 30)
+
+    # ACTION
+    start, end = get_full_month_ingestion_range(base_date_obj)
+    
+    # ASSERT
+    # Assert that end is strictly greater than start
+    assert end > start, "End date must be after start date for yfinance exclusivity"
+    
+    # If today is April 3rd, start should be April 1st and end should be April 3rd
+    assert start == datetime(2026, 4, 1)
+    assert end ==  datetime(2026,  5, 1)
+
 def test_ingest_valid_ticker(create_mock_stock_data):
     """
     Test that a valid ticker request triggers a fetch and a storage upload.
