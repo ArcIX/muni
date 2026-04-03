@@ -11,7 +11,7 @@ from google.api_core.exceptions import Forbidden
 import pyarrow.parquet as pq
 from dateutil.relativedelta import relativedelta
 from cloud_functions.market_ingestion.main import (
-    ingest_market_data, get_mtd_dates, get_start_and_end_of_month_dates
+    ingest_market_data, get_ingestion_range, get_full_month_ingestion_range
 )
 
 @patch("cloud_functions.market_ingestion.main.datetime")
@@ -20,7 +20,7 @@ def test_mtd_end_date_is_tomorrow(mock_dt):
     mock_dt.today.return_value = datetime(2026, 4, 3)
 
     # ACTION
-    start, end = get_mtd_dates()
+    start, end = get_ingestion_range()
     
     # ASSERT
     # Assert that end is strictly greater than start

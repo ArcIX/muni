@@ -24,7 +24,7 @@ def get_storage_client():
 
     return _STORAGE_CLIENT
 
-def get_mtd_dates():
+def get_ingestion_range():
     """
     Calculates the 1st of the current month and tomorrow's date
     to account for the end date exclusivity of yfinance
@@ -38,7 +38,7 @@ def get_mtd_dates():
     
     return first_of_month, tomorrow
 
-def get_start_and_end_of_month_dates(base_date_obj: datetime):
+def get_full_month_ingestion_range(base_date_obj: datetime):
     """
     Calculates the start of the month and the next month from the base date.
     """
@@ -76,14 +76,14 @@ def ingest_market_data(request):
     #   end_date = end of the month of start_date/end_date
     elif (start_date and not end_date) or (end_date and not start_date):
         base_date = start_date or end_date
-        start_date_obj, end_date_obj = get_start_and_end_of_month_dates(
+        start_date_obj, end_date_obj = get_full_month_ingestion_range(
             datetime.strptime(base_date, "%Y-%m-%d")
         )
         start_date = start_date_obj.strftime("%Y-%m-%d")
         end_date = end_date_obj.strftime("%Y-%m-%d")
     # If neither start_date nor end_date are provided, use month to date
     else:
-        start_date_obj, end_date_obj = get_mtd_dates()
+        start_date_obj, end_date_obj = get_ingestion_range()
 
     # Update the date strings based on what we calculated
     # from above if statements
