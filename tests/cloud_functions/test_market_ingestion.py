@@ -11,7 +11,8 @@ from google.api_core.exceptions import Forbidden
 import pyarrow.parquet as pq
 from dateutil.relativedelta import relativedelta
 from cloud_functions.market_ingestion.main import (
-    ingest_market_data, get_ingestion_range, get_full_month_ingestion_range
+    ingest_market_data, get_ingestion_range, get_full_month_ingestion_range,
+    upsert_ticker_history
 )
 
 @patch("cloud_functions.market_ingestion.main.datetime")
@@ -710,3 +711,15 @@ def test_history_date_is_date_type(
     
     # ASSERT
     assert str(date_field.type) == "date32[day]", f"Expected date32[day], got {date_field.type}"
+
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
+def test_upsert_ticker_history_runs_query(mock_get_bigquery_client):
+    # SETUP
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+
+    # ACTION
+    upsert_ticker_history()
+
+    # ASSERT
+    mock_bigquery_client.query.assert_called_once()
