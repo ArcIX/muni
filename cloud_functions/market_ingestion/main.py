@@ -192,6 +192,9 @@ def ingest_market_data(request):
             parquet_buffer.getvalue(), 
             content_type='application/octet-stream'
         )
+
+        # Update the Silver table
+        upsert_ticker_history()
         
         return f"Success! {len(df)} rows for {ticker_symbol} saved to {file_path}", 200
 
