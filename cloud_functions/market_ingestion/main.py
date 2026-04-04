@@ -1,6 +1,6 @@
 import yfinance as yf
 import pandas as pd
-from google.cloud import storage
+from google.cloud import storage, bigquery
 import functions_framework
 import io
 from datetime import datetime, timedelta
@@ -12,8 +12,21 @@ BRONZE_BUCKET_NAME = os.environ.get("BRONZE_BUCKET_NAME")
 if not BRONZE_BUCKET_NAME:
     raise RuntimeError("The BRONZE_BUCKET_NAME environment variable is not set.")
 
+BIGQUERY_DATASET_NAME = os.environ.get("BIGQUERY_DATASET_NAME")
+if not BIGQUERY_DATASET_NAME:
+    raise RuntimeError("The BIGQUERY_DATASET_NAME environment variable is not set.")
+
+BRONZE_TABLE_NAME = os.environ.get("BRONZE_TABLE_NAME")
+if not BRONZE_TABLE_NAME:
+    raise RuntimeError("The BRONZE_TABLE_NAME environment variable is not set.")
+
+SILVER_TABLE_NAME = os.environ.get("SILVER_TABLE_NAME")
+if not SILVER_TABLE_NAME:
+    raise RuntimeError("The SILVER_TABLE_NAME environment variable is not set.")
+
 # This lives in the global memory space of the "warm" instance
 _STORAGE_CLIENT = None
+_BIGQUERY_CLIENT = None
 
 # Lazy Singleton for the storage client
 def get_storage_client():
@@ -23,6 +36,14 @@ def get_storage_client():
         _STORAGE_CLIENT = storage.Client()
 
     return _STORAGE_CLIENT
+
+def get_bigquery_client():
+    global _BIGQUERY_CLIENT
+    
+    if _BIGQUERY_CLIENT is None:
+        _BIGQUERY_CLIENT = bigquery.Client()
+
+    return _BIGQUERY_CLIENT
 
 def get_ingestion_range():
     """
@@ -48,6 +69,44 @@ def get_full_month_ingestion_range(base_date_obj: datetime):
     first_of_next_month = first_of_month + relativedelta(months=1)
 
     return first_of_month, first_of_next_month
+
+def upsert_ticker_history():
+    """
+    Upserts the ticker history
+    """
+    bigquery_client = get_bigquery_client()
+
+    query_string = f"""
+        MERGE `{BIGQUERY_DATASET_NAME}.{SILVER_TABLE_NAME}` T
+        USING (
+        -- Grab the latest data from the Bronze External Table
+        SELECT 
+            Date AS trade_date,
+            ticker,
+            Open AS open,
+            High AS high,
+            Low AS low,
+            Close AS close,
+            Adj_Close AS adj_close,
+            Volume AS volume
+        FROM `{BIGQUERY_DATASET_NAME}.{BRONZE_TABLE_NAME}`
+        -- Optimization: Only look at the current month's files to save on processing costs
+        WHERE year = EXTRACT(YEAR FROM CURRENT_DATE())
+        AND month = EXTRACT(MONTH FROM CURRENT_DATE())
+        ) S
+        ON T.trade_date = S.trade_date AND T.ticker = S.ticker
+        WHEN MATCHED THEN
+        UPDATE SET 
+            open = S.open, high = S.high, low = S.low, 
+            close = S.close, adj_close = S.adj_close, volume = S.volume
+        WHEN NOT MATCHED THEN
+        INSERT (trade_date, ticker, open, high, low, close, adj_close, volume)
+        VALUES (trade_date, ticker, open, high, low, close, adj_close, volume);
+    """
+
+    query_job = bigquery_client.query(query_string)
+    print(f"Triggered Silver Update Job: {query_job.job_id}")
+
 @functions_framework.http
 def ingest_market_data(request):
     """HTTP Cloud Function to fetch yfinance data and save to GCS."""
