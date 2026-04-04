@@ -70,11 +70,14 @@ def get_full_month_ingestion_range(base_date_obj: datetime):
 
     return first_of_month, first_of_next_month
 
-def upsert_ticker_history():
+def upsert_ticker_history(target_date: datetime):
     """
     Upserts the ticker history
     """
     bigquery_client = get_bigquery_client()
+
+    year = target_date.year
+    month = target_date.month
 
     query_string = f"""
         MERGE `{BIGQUERY_DATASET_NAME}.{SILVER_TABLE_NAME}` T
@@ -91,8 +94,8 @@ def upsert_ticker_history():
             Volume AS volume
         FROM `{BIGQUERY_DATASET_NAME}.{BRONZE_TABLE_NAME}`
         -- Optimization: Only look at the current month's files to save on processing costs
-        WHERE year = EXTRACT(YEAR FROM CURRENT_DATE())
-        AND month = EXTRACT(MONTH FROM CURRENT_DATE())
+        WHERE year = {year}
+        AND month = {month}
         ) S
         ON T.trade_date = S.trade_date AND T.ticker = S.ticker
         WHEN MATCHED THEN
@@ -194,7 +197,7 @@ def ingest_market_data(request):
         )
 
         # Update the Silver table
-        upsert_ticker_history()
+        upsert_ticker_history(start_date_obj)
         
         return f"Success! {len(df)} rows for {ticker_symbol} saved to {file_path}", 200
 

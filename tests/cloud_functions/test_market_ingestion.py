@@ -771,10 +771,28 @@ def test_upsert_ticker_history_runs_query(mock_get_bigquery_client):
     mock_get_bigquery_client.return_value = mock_bigquery_client
 
     # ACTION
-    upsert_ticker_history()
+    upsert_ticker_history(datetime(2026, 1, 1))
 
     # ASSERT
     mock_bigquery_client.query.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
+def test_upsert_ticker_history_queries_by_date(mock_get_bigquery_client):
+    # SETUP
+    target_date_obj = datetime(2026, 1, 1)
+
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+
+    # ACTION
+    upsert_ticker_history(target_date=target_date_obj)
+
+    # Grab the query string from the call
+    query_str = mock_bigquery_client.query.call_args[0][0]
+
+    # ASSERT
+    assert f"year = 2026" in query_str
+    assert f"month = 1" in query_str
 
 @patch("cloud_functions.market_ingestion.main.upsert_ticker_history")
 @patch("cloud_functions.market_ingestion.main.get_bigquery_client")
