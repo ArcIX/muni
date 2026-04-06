@@ -11,7 +11,8 @@ from google.api_core.exceptions import Forbidden
 import pyarrow.parquet as pq
 from dateutil.relativedelta import relativedelta
 from cloud_functions.market_ingestion.main import (
-    ingest_market_data, get_ingestion_range, get_full_month_ingestion_range
+    ingest_market_data, get_ingestion_range, get_full_month_ingestion_range,
+    upsert_ticker_history
 )
 
 @patch("cloud_functions.market_ingestion.main.datetime")
@@ -110,7 +111,8 @@ def test_ingest_valid_ticker(create_mock_stock_data):
     # Mocking the external dependencies
     with (
         patch('yfinance.Ticker') as mock_ticker,
-        patch('google.cloud.storage.Client') as mock_storage
+        patch('google.cloud.storage.Client') as mock_storage,
+        patch('cloud_functions.market_ingestion.main.get_bigquery_client') as mock_get_bigquery_client
     ):
         
         # Setup the fake yfinance behavior
@@ -120,6 +122,10 @@ def test_ingest_valid_ticker(create_mock_stock_data):
         # Setup the fake storage behavior
         mock_bucket = mock_storage.return_value.bucket.return_value
         mock_blob = mock_bucket.blob.return_value
+
+        # Setup the fake BigQuery behavior
+        mock_bigquery_client = MagicMock()
+        mock_get_bigquery_client.return_value = mock_bigquery_client
         
         # ACT
         response, status_code = ingest_market_data(mock_request)
@@ -172,9 +178,10 @@ def test_ingest_invalid_ticker(mock_ticker, mock_get_client):
     # In this scenario,the upload method should not have been called
     mock_blob.upload_from_string.assert_not_called()
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
-def test_ingest_missing_ticker(mock_ticker, mock_get_client, create_mock_stock_data):
+def test_ingest_missing_ticker(mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data):
     """
     Test that an ticker defaults to AAPL if no ticker is provided.
     """
@@ -196,6 +203,10 @@ def test_ingest_missing_ticker(mock_ticker, mock_get_client, create_mock_stock_d
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -248,10 +259,11 @@ def test_raises_server_error(mock_ticker, mock_get_client, create_mock_stock_dat
     assert "403" in response
     assert "Access Denied" in response
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_history_with_date_range(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -278,6 +290,10 @@ def test_history_with_date_range(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -298,10 +314,11 @@ def test_history_with_date_range(
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_end_date_without_start_date(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     """
     Test that providing an end date without a start date defaults the 
@@ -344,6 +361,10 @@ def test_end_date_without_start_date(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -366,10 +387,11 @@ def test_end_date_without_start_date(
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_start_date_without_end_date(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     """
     Test that providing a start date without an end date defaults the 
@@ -411,6 +433,10 @@ def test_start_date_without_end_date(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -434,10 +460,12 @@ def test_start_date_without_end_date(
     mock_blob.upload_from_string.assert_called_once()
 
 @patch("cloud_functions.market_ingestion.main.datetime")
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_no_start_date_and_end_date(
-    mock_ticker, mock_get_client, mock_dt, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client,
+    mock_dt, create_mock_stock_data
 ):
     """
     Test that providing no start and end date defaults the 
@@ -477,6 +505,10 @@ def test_no_start_date_and_end_date(
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
     
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+    
     # ACT
     response, status_code = ingest_market_data(mock_request)
     
@@ -499,10 +531,12 @@ def test_no_start_date_and_end_date(
     mock_blob.upload_from_string.assert_called_once()
 
 @patch("cloud_functions.market_ingestion.main.datetime")
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_no_start_date_and_end_date_first_of_month(
-    mock_ticker, mock_get_client, mock_dt, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client,
+    mock_dt, create_mock_stock_data
 ):
     """
     Test that providing no start and end date when its the first day of
@@ -539,6 +573,10 @@ def test_no_start_date_and_end_date_first_of_month(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -561,10 +599,11 @@ def test_no_start_date_and_end_date_first_of_month(
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_blob_file_path(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     """
     Test that blob file path is constructed correctly
@@ -610,6 +649,10 @@ def test_blob_file_path(
         f"/history.parquet"
     )
 
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+
     # ACT
     response, status_code = ingest_market_data(mock_request)
 
@@ -623,10 +666,11 @@ def test_blob_file_path(
     # Did it call the upload method?
     mock_blob.upload_from_string.assert_called_once()
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_history_contains_adjusted_close(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -653,6 +697,10 @@ def test_history_contains_adjusted_close(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -666,10 +714,11 @@ def test_history_contains_adjusted_close(
     # ASSERT
     assert "Adj Close" in results_df.columns, "Adj Close column is missing!"
 
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
 @patch("cloud_functions.market_ingestion.main.get_storage_client")
 @patch("yfinance.Ticker")
 def test_history_date_is_date_type(
-    mock_ticker, mock_get_client, create_mock_stock_data
+    mock_ticker, mock_get_client, mock_get_bigquery_client, create_mock_stock_data
 ):
     # SETUP
     # Mock the incoming HTTP request from Google Cloud Functions
@@ -696,6 +745,10 @@ def test_history_date_is_date_type(
     mock_get_client.return_value = mock_storage
     mock_bucket = mock_storage.bucket.return_value
     mock_blob = mock_bucket.blob.return_value
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
     
     # ACT
     response, status_code = ingest_market_data(mock_request)
@@ -710,3 +763,70 @@ def test_history_date_is_date_type(
     
     # ASSERT
     assert str(date_field.type) == "date32[day]", f"Expected date32[day], got {date_field.type}"
+
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
+def test_upsert_ticker_history_runs_query(mock_get_bigquery_client):
+    # SETUP
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+
+    # ACTION
+    upsert_ticker_history(datetime(2026, 1, 1))
+
+    # ASSERT
+    mock_bigquery_client.query.assert_called_once()
+
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
+def test_upsert_ticker_history_queries_by_date(mock_get_bigquery_client):
+    # SETUP
+    target_date_obj = datetime(2026, 1, 1)
+
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+
+    # ACTION
+    upsert_ticker_history(target_date=target_date_obj)
+
+    # Grab the query string from the call
+    query_str = mock_bigquery_client.query.call_args[0][0]
+
+    # ASSERT
+    assert f"year = 2026" in query_str
+    assert f"month = 1" in query_str
+
+@patch("cloud_functions.market_ingestion.main.upsert_ticker_history")
+@patch("cloud_functions.market_ingestion.main.get_bigquery_client")
+@patch("cloud_functions.market_ingestion.main.get_storage_client")
+@patch("yfinance.Ticker")
+def test_ingestion_triggers_silver_upsert(
+    mock_ticker, mock_get_storage_client, mock_get_bigquery_client,
+    mock_upsert, create_mock_stock_data
+):
+    # SETUP
+    mock_request = MagicMock()
+    mock_request.get_json.return_value = {
+        "ticker": "AAPL"
+    }
+    mock_request.args = {}
+    
+    # Create a dummy DataFrame to simulate yfinance data
+    mock_df = create_mock_stock_data(days=31)
+    
+    # Setup the fake yfinance behavior
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+    
+    # Setup the fake storage behavior
+    mock_storage = MagicMock()
+    mock_get_storage_client.return_value = mock_storage
+
+    # Setup the fake BigQuery behavior
+    mock_bigquery_client = MagicMock()
+    mock_get_bigquery_client.return_value = mock_bigquery_client
+    
+    # ACTION
+    ingest_market_data(mock_request)
+    
+    # ASSERT
+    # This confirms the "Automation Trigger" is actually wired up!
+    mock_upsert.assert_called_once()

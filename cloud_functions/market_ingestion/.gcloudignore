@@ -15,4 +15,5 @@
 
 node_modules
 __pycache__/
+env.yaml
 # #!include:.gitignore
