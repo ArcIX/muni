@@ -18,12 +18,15 @@ def test_bigquery_provider_init(mock_client):
     assert isinstance(bigquery_provider.dataset_name, str)
 
 @pytest.mark.unit
-def test_get_data_returns_dataframe(create_mock_stock_data):
+def test_get_data_returns_dataframe(tmp_path, create_mock_stock_data):
     # SETUP
     ticker = "AAPL"
     start_date = "2020-01-01"
     end_date = "2020-01-31"
     dataset_name = "test_dataset"
+
+    cache_path = tmp_path / "data" / ".cache"
+    cache_path.mkdir(parents=True)
 
     mock_client = MagicMock()
     mock_query_job = MagicMock()
@@ -46,6 +49,7 @@ def test_get_data_returns_dataframe(create_mock_stock_data):
 
     # ACTION
     bigquery_provider = BigQueryProvider(mock_client, dataset_name)
+    bigquery_provider.cache_dir = cache_path
     results_df = bigquery_provider.get_data(
         "AAPL", "2020-01-01", "2020-01-31", mock_strategy
     )
@@ -59,3 +63,48 @@ def test_get_data_returns_dataframe(create_mock_stock_data):
     
     # Verify the final output is our mock dataframe
     pd.testing.assert_frame_equal(results_df, mock_df)
+
+@pytest.mark.unit
+def test_get_data_caches_results(tmp_path, create_mock_stock_data):
+    # SETUP
+    ticker = "AAPL"
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+    dataset_name = "test_dataset"
+
+    cache_path = tmp_path / "data" / ".cache"
+    cache_path.mkdir(parents=True)
+
+    mock_client = MagicMock()
+    mock_query_job = MagicMock()
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    mock_client.query.return_value = mock_query_job
+    mock_query_job.to_dataframe.return_value = mock_df
+
+    mock_strategy = MagicMock()
+    # Mock the strategy's unimplemented get_sql_query_string method
+    # to return a valid SQL query
+    mock_query_str = f"""
+        SELECT
+            *
+        FROM `{dataset_name}.test_table`
+        WHERE
+            ticker = '{ticker}'
+            AND date BETWEEN '{start_date}' AND '{end_date}'
+    """
+    mock_strategy.get_sql_query_string.return_value = mock_query_str
+
+    save_path = cache_path / (
+        f"{ticker}_{start_date}_{end_date}_"
+        f"{mock_strategy.__class__.__name__}.parquet"
+    )
+
+    # ACTION
+    bigquery_provider = BigQueryProvider(mock_client, dataset_name)
+    bigquery_provider.cache_dir = cache_path
+    results_df = bigquery_provider.get_data(
+        "AAPL", "2020-01-01", "2020-01-31", mock_strategy
+    )
+
+    # ASSERT
+    assert save_path.exists()
