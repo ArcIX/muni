@@ -11,13 +11,10 @@ class BigQueryProvider(BaseProvider):
         self, client: bigquery.Client, dataset_name: str, cache_dir: str = "data/.cache",
         max_age_seconds: float = 86400
     ) -> None:
+        super().__init__(cache_dir, max_age_seconds)
+
         self.client = client
         self.dataset_name = dataset_name
-
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
-
-        self.max_age_seconds = max_age_seconds
 
     def get_data(
         self, ticker: str, start_date: str, end_date: str, strategy: BaseStrategy
