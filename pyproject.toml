@@ -5,13 +5,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "muni"
 version = "0.1.0"
+requires-python = ">=3.11"
 description = "A trading strategy backtesting tool"
 dependencies = [
-    "yfinance",
-    "pandas",
-    "pyarrow",
-    "matplotlib",
-    "yfinance-cache",   # To help with Yahoo Finance API rate limits
+    "yfinance==1.2.0",
+    "pandas==2.3.3",
+    "pyarrow==23.0.1",
+    "google-cloud-bigquery==2.6.1"
+    "matplotlib==3.10.8",
+    "yfinance-cache==0.7.15",   # To help with Yahoo Finance API rate limits
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.0.2",
 ]
 
 [tool.setuptools.packages.find]
