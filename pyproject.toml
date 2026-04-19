@@ -12,6 +12,8 @@ dependencies = [
     "pandas==2.3.3",
     "pyarrow==23.0.1",
     "google-cloud-bigquery==2.6.1",
+    "google-cloud-storage==2.19.0",
+    "functions-framework==3.10.1",
     "matplotlib==3.10.8",
     "yfinance-cache==0.7.15",   # To help with Yahoo Finance API rate limits
 ]
