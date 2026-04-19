@@ -45,3 +45,33 @@ def test_get_data_returns_dataframe(mock_ticker, tmp_path, create_mock_stock_dat
     )
 
     pd.testing.assert_frame_equal(results_df, mock_df)
+
+@patch("muni.providers.yfinance.yf.Ticker") 
+@pytest.mark.unit
+def test_get_data_caches_results(mock_ticker, tmp_path, create_mock_stock_data):
+    # SETUP
+    ticker = "AAPL"
+    start_date = "2020-01-01"
+    end_date = "2020-01-31"
+    mock_strategy = MagicMock()
+
+    cache_path = tmp_path / "data" / ".cache"
+    cache_path.mkdir(parents=True)
+
+    mock_df = create_mock_stock_data(days=31, start=start_date)
+    mock_strategy.get_data.return_value = mock_df
+
+    mock_ticker_instance = mock_ticker.return_value
+    mock_ticker_instance.history.return_value = mock_df
+
+    # ACTION
+    yfinance_provider = YFinanceProvider()
+    yfinance_provider.cache_dir = cache_path
+    yfinance_provider.get_data(ticker, start_date, end_date, mock_strategy)
+
+    # ASSERT
+    save_path = cache_path / (
+        f"{ticker}_{start_date}_{end_date}_"
+        f"{mock_strategy.__class__.__name__}.parquet"
+    )
+    assert save_path.exists()
