@@ -27,6 +27,11 @@ jobs:
         pip install -e ".[test]"
 
     - name: Run Pytest
+      env:
+        BRONZE_BUCKET_NAME: ${{ vars.BRONZE_BUCKET_NAME }}
+        BIGQUERY_DATASET_NAME: ${{ vars.BIGQUERY_DATASET_NAME }}
+        BRONZE_TABLE_NAME: ${{ vars.BRONZE_TABLE_NAME }}
+        SILVER_TABLE_NAME: ${{ vars.SILVER_TABLE_NAME }}
       run: |
         # Use -m unit to run only unit tests (excluding integration/e2e)
         pytest -m unit
