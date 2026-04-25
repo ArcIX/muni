@@ -1,7 +1,7 @@
 import pandas as pd
-from muni.strategies import BaseStrategy
+from muni.strategies import BigQueryStrategy
 
-class SMACrossover(BaseStrategy):
+class SMACrossover(BigQueryStrategy):
     def __init__(self, fast_window: int = 50, slow_window: int = 200):
         self.fast_window = fast_window
         self.slow_window = slow_window
@@ -19,6 +19,9 @@ class SMACrossover(BaseStrategy):
         return data_df
     
     def get_sql_query_string(self, ticker: str, start_date: str, end_date: str) -> str:
+        dataset_name = self._get_dataset_name()
+        table_name = self._get_table_name()
+
         return f"""
             WITH indicators AS (
                 SELECT
@@ -28,7 +31,7 @@ class SMACrossover(BaseStrategy):
                     -- Calculate short and long term averages
                     AVG(adj_close) OVER(fast_window) AS fast_sma,
                     AVG(adj_close) OVER(slow_window) AS slow_sma
-                FROM `test_dataset.test_table`
+                FROM `{dataset_name}.{table_name}`
                 WHERE 
                     ticker = '{ticker}' AND 
                     trade_date BETWEEN '{start_date}' AND '{end_date}'
