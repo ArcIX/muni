@@ -1,5 +1,10 @@
+from dotenv import load_dotenv
+load_dotenv(".env")
+
 import pytest
 import pandas as pd
+import textwrap
+import os
 from muni.strategies import SMACrossover
 
 @pytest.mark.unit
@@ -105,3 +110,66 @@ def test_sma_signal_entry_timing():
     
     # Day 6 (index 5) is the first day we are actually 'In the Market'
     assert results_df["signal"].iloc[5] == 1, "Signal failed to trigger on the day after crossover"
+
+@pytest.mark.unit
+def test_get_sql_query_string():
+    # SETUP
+    dataset_name = os.environ.get("BIGQUERY_DATASET_NAME")
+    table_name = os.environ.get("SILVER_TABLE_NAME")
+
+    ticker = "AAPL"
+    start_date = "2022-01-01"
+    end_date = "2023-01-01"
+
+    fast_window = 5
+    slow_window = 10
+
+    # ACTION
+    sma_strat = SMACrossover(fast_window=fast_window, slow_window=slow_window)
+    query_string = sma_strat.get_sql_query_string(ticker, start_date, end_date)
+
+    # ASSERT
+    sma_signals_query_string = f"""
+        WITH indicators AS (
+            SELECT
+                trade_date,
+                ticker,
+                adj_close,
+                -- Calculate short and long term averages
+                AVG(adj_close) OVER(fast_window) AS fast_sma,
+                AVG(adj_close) OVER(slow_window) AS slow_sma
+            FROM `{dataset_name}.{table_name}`
+            WHERE 
+                ticker = '{ticker}' AND 
+                trade_date BETWEEN '{start_date}' AND '{end_date}'
+            WINDOW 
+                fast_window AS (
+                    PARTITION BY ticker
+                    ORDER BY trade_date
+                    ROWS BETWEEN {fast_window - 1} PRECEDING AND CURRENT ROW
+                ),
+                slow_window AS (
+                    PARTITION BY ticker
+                    ORDER BY trade_date
+                    ROWS BETWEEN {slow_window - 1} PRECEDING AND CURRENT ROW
+                )
+        ),
+        raw_signals AS (
+            SELECT
+                *,
+                -- Signal Generation Logic
+                -- Calculate the "State" (1 if fast > slow)
+                CASE
+                WHEN fast_sma > slow_sma THEN 1
+                ELSE 0
+                END AS raw_signal
+            FROM indicators
+        )
+        SELECT
+        *,
+        -- Shift the signal by 1 day to match Python's .shift(1)
+        -- This ensures 'today's' signal is actually 'yesterday's' math
+        LAG(raw_signal) OVER(PARTITION BY ticker ORDER BY trade_date) AS bq_signal
+        FROM raw_signals;
+    """
+    assert textwrap.dedent(query_string) == textwrap.dedent(sma_signals_query_string)
