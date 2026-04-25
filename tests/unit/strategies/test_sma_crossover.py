@@ -1,6 +1,10 @@
+from dotenv import load_dotenv
+load_dotenv(".env")
+
 import pytest
 import pandas as pd
 import textwrap
+import os
 from muni.strategies import SMACrossover
 
 @pytest.mark.unit
@@ -110,6 +114,9 @@ def test_sma_signal_entry_timing():
 @pytest.mark.unit
 def test_get_sql_query_string():
     # SETUP
+    dataset_name = os.environ.get("BIGQUERY_DATASET_NAME")
+    table_name = os.environ.get("SILVER_TABLE_NAME")
+
     ticker = "AAPL"
     start_date = "2022-01-01"
     end_date = "2023-01-01"
@@ -131,7 +138,7 @@ def test_get_sql_query_string():
                 -- Calculate short and long term averages
                 AVG(adj_close) OVER(fast_window) AS fast_sma,
                 AVG(adj_close) OVER(slow_window) AS slow_sma
-            FROM `test_dataset.test_table`
+            FROM `{dataset_name}.{table_name}`
             WHERE 
                 ticker = '{ticker}' AND 
                 trade_date BETWEEN '{start_date}' AND '{end_date}'
