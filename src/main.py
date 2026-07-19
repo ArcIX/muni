@@ -1,15 +1,20 @@
 import pandas as pd
 from muni.data_loader import fetch_data
 from muni.strategies import BaseStrategy, SMACrossover, RSIMeanReversion
+from muni.providers import BaseProvider, YFinanceProvider, BigQueryProvider
 from muni.engine import BacktestEngine
 
-def run_pipeline(ticker: str, strategy: BaseStrategy, capital: float):
+def run_pipeline(
+    ticker: str, start_date: str, end_date: str,
+    strategy: BaseStrategy, provider: BaseProvider,
+    capital: float
+):
     print(f"\n{'='*30}")
     print(f"STARTING BACKTEST: {ticker}")
     print(f"{'='*30}")
 
     # Load Data
-    stocks_df = fetch_data(ticker)
+    stocks_df = provider.get_data(ticker, start_date, end_date, strategy)
     if stocks_df.empty:
         raise ValueError("No data returned")
 
@@ -46,10 +51,11 @@ def run_pipeline(ticker: str, strategy: BaseStrategy, capital: float):
     return results_df
 
 if __name__ == "__main__":
-    # Example: Backtesting Apple with SMA Crossover
-    sma_strat = SMACrossover(fast_window=4, slow_window=8)
-    run_pipeline("AAPL", sma_strat, 10000.0)
+    pass
+    # # Example: Backtesting Apple with SMA Crossover
+    # sma_strat = SMACrossover(fast_window=4, slow_window=8)
+    # run_pipeline("AAPL", sma_strat, 10000.0)
 
-    # Example: Backtesting Apple with RSI Mean Reversion
-    rsi_strat = RSIMeanReversion(window=3)
-    run_pipeline("AAPL", rsi_strat, 10000.0)
+    # # Example: Backtesting Apple with RSI Mean Reversion
+    # rsi_strat = RSIMeanReversion(window=3)
+    # run_pipeline("AAPL", rsi_strat, 10000.0)
