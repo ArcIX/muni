@@ -173,3 +173,18 @@ def test_get_sql_query_string():
         FROM raw_signals;
     """
     assert textwrap.dedent(query_string) == textwrap.dedent(sma_signals_query_string)
+
+@pytest.mark.unit
+def test_sma_crossover_bigquery_signal_generation():
+    # SETUP
+    data_df = pd.DataFrame({"bq_signal": [0, 1, 1, 1, 0, 0, 0]}, index=pd.date_range("2024-01-01", periods=7))
+
+    fast_window = 5
+    slow_window = 10
+
+    # ACTION
+    sma_strat = SMACrossover(fast_window=fast_window, slow_window=slow_window)
+    results_df = sma_strat.generate_signals(data_df)
+
+    # ASSERT
+    assert (results_df["signal"] == data_df["bq_signal"]).all()
