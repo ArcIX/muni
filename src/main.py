@@ -1,4 +1,6 @@
 import pandas as pd
+import os
+from google.cloud import bigquery
 from muni.data_loader import fetch_data
 from muni.strategies import BaseStrategy, SMACrossover, RSIMeanReversion
 from muni.providers import BaseProvider, YFinanceProvider, BigQueryProvider
@@ -51,11 +53,33 @@ def run_pipeline(
     return results_df
 
 if __name__ == "__main__":
-    pass
-    # # Example: Backtesting Apple with SMA Crossover
-    # sma_strat = SMACrossover(fast_window=4, slow_window=8)
-    # run_pipeline("AAPL", sma_strat, 10000.0)
+    # Using YFinance
+    # Example: Backtesting Apple with SMA Crossover
+    ticker = "AAPL"
+    start_date = "2026-01-01"
+    end_date = "2026-01-31"
+    sma_strat = SMACrossover(fast_window=4, slow_window=8)
+    yf_provider = YFinanceProvider()
+    capital = 10000
+    run_pipeline(ticker, start_date, end_date, sma_strat, yf_provider, capital)
 
-    # # Example: Backtesting Apple with RSI Mean Reversion
-    # rsi_strat = RSIMeanReversion(window=3)
-    # run_pipeline("AAPL", rsi_strat, 10000.0)
+    # Example: Backtesting Apple with RSI Mean Reversion
+    ticker = "AAPL"
+    start_date = "2026-01-01"
+    end_date = "2026-01-31"
+    rsi_strat = RSIMeanReversion(window=3)
+    yf_provider = YFinanceProvider()
+    capital = 10000
+    run_pipeline(ticker, start_date, end_date, sma_strat, yf_provider, capital)
+
+    # Using BigQuery
+    # Example: Backtesting Apple with SMA Crossover
+    # ticker = "AAPL"
+    # start_date = "2026-01-01"
+    # end_date = "2026-01-31"
+    # sma_strat = SMACrossover(fast_window=4, slow_window=8)
+    # bq_client = bigquery.Client()
+    # bq_dataset_name = os.environ.get("BIGQUERY_DATASET_NAME")
+    # bq_provider = BigQueryProvider(bq_client, bq_dataset_name)
+    # capital = 10000
+    # run_pipeline(ticker, start_date, end_date, sma_strat, bq_provider, capital)
