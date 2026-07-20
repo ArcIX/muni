@@ -55,3 +55,22 @@ def test_run_pipeline_handles_empty_data(mock_fetch):
     
     with pytest.raises(ValueError, match="No data returned"):
         results_df = run_pipeline(ticker, start_date, end_date, sma_strat, bq_provider, 10000)
+
+@pytest.mark.integration
+@patch("main.YFinanceProvider.get_data")
+def test_run_pipeline_sma_yf_returns_dataframe(mock_fetch, create_mock_stock_data):
+    # SETUP
+    ticker = "AAPL"
+    start_date = "2022-01-01"
+    end_date = "2022-01-31"
+    stocks_df = create_mock_stock_data(days=31, start=start_date)
+    mock_fetch.return_value = stocks_df
+
+    # ACTION
+    sma_strat = SMACrossover(fast_window=5, slow_window=20)
+    yf_provider = YFinanceProvider()
+    results_df = run_pipeline(ticker, start_date, end_date, sma_strat, yf_provider, 10000)
+
+    # ASSERT
+    mock_fetch.assert_called_once_with(ticker, start_date, end_date, sma_strat)
+    assert isinstance(results_df, pd.DataFrame)
