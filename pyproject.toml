@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "muni"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "A trading strategy backtesting tool"
+dependencies = [
+    "yfinance==1.2.0",
+    "pandas==2.3.3",
+    "pyarrow==23.0.1",
+    "google-cloud-bigquery>=3.0.0",
+    "google-cloud-storage>=2.19.0",
+    "functions-framework==3.10.1",
+    "matplotlib==3.10.8",
+    "yfinance-cache==0.7.15",   # To help with Yahoo Finance API rate limits
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.0.2",
+    "python-dotenv==1.2.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+markers = [
+    "unit: Fast isolated logic tests.",
+    "integration: Slower tests that hit disk, database, or network.",
+]
