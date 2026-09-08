@@ -53,7 +53,7 @@ def test_sma_crossover_fast_below_slow():
     # SETUP: Create a "mountain" price pattern
     # Price goes up (Golden Cross), then crashes (Death Cross)
     prices = [10, 11, 12, 13, 14, 15, 10, 8, 6, 4]
-    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=10))
+    stock_df = pd.DataFrame({"adj_close": prices}, index=pd.date_range("2024-01-01", periods=10))
     
     # ACTION: Using very small windows to force the cross quickly
     sma_strat = SMACrossover(fast_window=2, slow_window=4)
@@ -74,7 +74,7 @@ def test_sma_crossover_fast_above_slow():
     # SETUP: Create a "valley" price pattern
     # Price goes down, then goes up
     prices = [14, 11, 7, 6, 4, 6, 10, 12, 15, 20]
-    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=10))
+    stock_df = pd.DataFrame({"adj_close": prices}, index=pd.date_range("2024-01-01", periods=10))
     
     # ACTION: Using very small windows to force the cross quickly
     sma_strat = SMACrossover(fast_window=2, slow_window=4)
@@ -97,7 +97,7 @@ def test_sma_signal_entry_timing():
     # SETUP: Fast MA (2-day) will cross Slow MA (4-day) on Day 5
     # Price sequence that forces a crossover
     prices = [10, 10, 10, 10, 20, 25, 30] 
-    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=7))
+    stock_df = pd.DataFrame({"adj_close": prices}, index=pd.date_range("2024-01-01", periods=7))
     
     # ACTION
     sma_strat = SMACrossover(fast_window=2, slow_window=4)
