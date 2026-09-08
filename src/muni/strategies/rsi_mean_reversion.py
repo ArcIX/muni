@@ -14,7 +14,7 @@ class RSIMeanReversion(BaseStrategy):
     def generate_signals(self, df: pd.DataFrame):
         data_df = df.copy()
 
-        data_df["delta"] = data_df["Close"].diff()
+        data_df["delta"] = data_df["adj_close"].diff()
 
         # Gains are the positive deltas.
         # Turn negative deltas to 0.

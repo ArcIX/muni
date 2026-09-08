@@ -16,8 +16,8 @@ class SMACrossover(BigQueryStrategy):
             data_df["signal"] = data_df["bq_signal"]
             return data_df
         
-        data_df["fast_ma"] = data_df["Close"].rolling(window=self.fast_window).mean()
-        data_df["slow_ma"] = data_df["Close"].rolling(window=self.slow_window).mean()
+        data_df["fast_ma"] = data_df["adj_close"].rolling(window=self.fast_window).mean()
+        data_df["slow_ma"] = data_df["adj_close"].rolling(window=self.slow_window).mean()
         
         # Raw signal: 1 if fast > slow
         raw_signal = (data_df["fast_ma"] > data_df["slow_ma"]).astype(int)
