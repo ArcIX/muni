@@ -39,7 +39,7 @@ def test_rsi_signal_persistence_and_timing_valley_prices():
     """
     # SETUP: Scenario where the prices dip then rise back up
     prices = [100, 90, 80, 70, 100, 150, 140]
-    stock_df = pd.DataFrame({'Close': prices}, index=pd.date_range("2024-01-01", periods=7))
+    stock_df = pd.DataFrame({'adj_close': prices}, index=pd.date_range("2024-01-01", periods=7))
     
     rsi_mr_strat = RSIMeanReversion(
         window=3,
@@ -69,7 +69,7 @@ def test_rsi_signal_persistence_and_timing_mountain_prices():
     """
     # SETUP: Scenario where the prices rise then dip
     prices = [100, 110, 120, 130, 110, 90, 70, 80]
-    stock_df = pd.DataFrame({"Close": prices}, index=pd.date_range("2024-01-01", periods=8))
+    stock_df = pd.DataFrame({"adj_close": prices}, index=pd.date_range("2024-01-01", periods=8))
 
     rsi_mr_strat = RSIMeanReversion(
         window=3,
