@@ -22,9 +22,31 @@ class YFinanceProvider(BaseProvider):
 
         print(f"--- Cache Miss: Fetching {ticker} from YFinance ---")
         # Fetch the data from YFinance
-        ticker = yf.Ticker(ticker)
-        results_df = ticker.history(start=start_date, end=end_date, auto_adjust=False)
+        yf_ticker = yf.Ticker(ticker)
+        results_df = yf_ticker.history(start=start_date, end=end_date, auto_adjust=False)
+        
+        # Remove columns we don't need
+        results_df = results_df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
 
+        # Add trade_date column
+        results_df.reset_index(inplace=True)
+        results_df["trade_date"] = pd.to_datetime(results_df["Date"]).dt.tz_localize(None).dt.normalize()
+
+        # Add ticker column
+        results_df["ticker"] = ticker
+
+        # Rename columns
+        results_df = results_df.rename(
+            columns={
+                "Open": "open", "High": "high", "Low": "low", "Close": "close",
+                "Adj Close": "adj_close", "Volume": "volume"
+            }
+        )
+
+        # Reorder columns
+        results_df = results_df[["trade_date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]]
+        
+        # Save to parquet
         results_df.to_parquet(cache_path)
 
         return results_df
