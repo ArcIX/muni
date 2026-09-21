@@ -25,18 +25,29 @@ class YFinanceProvider(BaseProvider):
         yf_ticker = yf.Ticker(ticker)
         results_df = yf_ticker.history(start=start_date, end=end_date, auto_adjust=False)
         
+        # Align schema
+        results_df = self._align_schema(results_df, ticker)
+        
+        # Save to parquet
+        results_df.to_parquet(cache_path)
+
+        return results_df
+
+    def _align_schema(self, df: pd.DataFrame, ticker: str) -> pd.DataFrame:
+        aligned_df = df.copy()
+
         # Remove columns we don't need
-        results_df = results_df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
+        aligned_df = aligned_df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
 
         # Add trade_date column
-        results_df.reset_index(inplace=True)
-        results_df["trade_date"] = pd.to_datetime(results_df["Date"]).dt.tz_localize(None).dt.normalize()
+        aligned_df.reset_index(inplace=True)
+        aligned_df["trade_date"] = pd.to_datetime(aligned_df["Date"]).dt.tz_localize(None).dt.normalize()
 
         # Add ticker column
-        results_df["ticker"] = ticker
+        aligned_df["ticker"] = ticker
 
         # Rename columns
-        results_df = results_df.rename(
+        aligned_df = aligned_df.rename(
             columns={
                 "Open": "open", "High": "high", "Low": "low", "Close": "close",
                 "Adj Close": "adj_close", "Volume": "volume"
@@ -44,9 +55,6 @@ class YFinanceProvider(BaseProvider):
         )
 
         # Reorder columns
-        results_df = results_df[["trade_date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]]
-        
-        # Save to parquet
-        results_df.to_parquet(cache_path)
+        aligned_df = aligned_df[["trade_date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]]
 
-        return results_df
+        return aligned_df
